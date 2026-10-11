@@ -165,7 +165,11 @@ ssh root@<printer-ip> '/etc/init.d/S59mjpg_streamer stop; rm -f /etc/init.d/S59m
 - Camera `1280x720 @ 15fps` on `/dev/v4l/by-id/main-video-4`
 - Verified: stream and snapshot endpoints, the printer's own web UI, the OrcaSlicer Device tab,
   and restart through the init script
-- Boot persistence follows from the `rcS` loop over `/etc/init.d/S??*`
+- Boot persistence verified by a full reboot: with `uptime` at 0 minutes `mjpg_streamer` was
+  already running and the stream was available, with no manual step
+
+Note that the printer takes several minutes to come back after `reboot` before SSH and the
+web interface answer again. That is normal, the camera is up as soon as they are.
 
 ## References
 
