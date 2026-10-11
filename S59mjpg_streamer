@@ -1,0 +1,62 @@
+#!/bin/sh
+#
+# Публикация потока внутренней камеры K1C как MJPEG на порту 8080.
+#
+# Прошивка 1.3.5.22 отдаёт кадры сервисом cam_app через memfd (libmemfd.so),
+# а не через /dev/v4l напрямую, поэтому плагин input_uvc.so неприменим:
+# камеру уже держит cam_app. Плагин input_memfd.so цепляется к cam_app
+# как memfd-клиент и перекладывает кадры в обычный MJPEG на 8080,
+# который понимают веб-интерфейс принтера, Fluidd, Mainsail и OrcaSlicer.
+
+DAEMON=/usr/bin/mjpg_streamer
+INPUT="/usr/lib/mjpg-streamer/input_memfd.so -t 0"
+OUTPUT="/usr/lib/mjpg-streamer/output_http.so -w /usr/share/mjpg-streamer/www/ -p 8080"
+
+start() {
+    if pidof mjpg_streamer > /dev/null 2>&1; then
+        printf "mjpg_streamer: already running\n"
+        return 0
+    fi
+
+    # cam_app поднимается позже, кадров до него нет
+    i=0
+    while ! pidof cam_app > /dev/null 2>&1 && [ "$i" -lt 30 ]; do
+        sleep 1
+        i=$((i + 1))
+    done
+
+    if ! pidof cam_app > /dev/null 2>&1; then
+        printf "mjpg_streamer: cam_app not running, camera unavailable\n"
+        return 1
+    fi
+
+    printf "Starting mjpg_streamer: "
+    $DAEMON -b -i "$INPUT" -o "$OUTPUT"
+    [ $? = 0 ] && printf "OK\n" || printf "FAIL\n"
+}
+
+stop() {
+    printf "Stopping mjpg_streamer: "
+    killall mjpg_streamer 2> /dev/null
+    printf "OK\n"
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart | reload)
+        stop
+        sleep 1
+        start
+        ;;
+    *)
+        printf "Usage: %s {start|stop|restart}\n" "$0"
+        exit 1
+        ;;
+esac
+
+exit $?
